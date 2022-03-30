@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+	<name>frozenshipping</name>
+	<displayName><![CDATA[frozen products shipping]]></displayName>
+	<version><![CDATA[1.0.0]]></version>
+	<description><![CDATA[This module define a shipping method for a certain category of products]]></description>
+	<author><![CDATA[lxfrance]]></author>
+	<tab><![CDATA[administration]]></tab>
+	<is_configurable>1</is_configurable>
+	<need_instance>1</need_instance>
+</module>
