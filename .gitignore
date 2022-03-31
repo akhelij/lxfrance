@@ -120,6 +120,7 @@ app/config/config.php
 # Themes, modules and overrides
 
 modules/*
+!modules/frozenshipping
 override/*
 themes/*/
 !themes/classic

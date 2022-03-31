@@ -26,17 +26,12 @@
 * to avoid any conflicts with others containers.
 */
 
-
-// if(typeof(AJAX_URL) != 'undefined'){
-//     console.info(AJAX_URL);
-    $('.mogh .js-frozen-carrier').on('click', function(){
-        
+if(typeof(AJAX_URL) != 'undefined'){
+    $('.frozenshipping_module .js-frozen-carrier').on('click', function(){
+        console.info(AJAX_URL);
         var selected_carrier = 0;
 
         $('.js-frozen-carrier[name="delivery_option[]"]').each(function(){
-    
-            // console.info($(this).val());
-            // console.info($(this).is(':checked'));
             if($(this).is(':checked')){
                 selected_carrier = $(this).val();
                 console.info(selected_carrier);
@@ -44,8 +39,7 @@
     });
 
         $.ajax({
-            // url : AJAX_URL,
-            url: 'http://lxfrance.test/en/module/frozenshipping/ajax',
+            url : AJAX_URL,
             type : 'POST',
             async: true,
             dataType : "json",
@@ -56,14 +50,10 @@
             },
             success : function (result) {
                 console.log(result);
-                // $('#lnk_products_content').html(result);
             },
             error : function (error) {
-                // console.log(error);
                 console.log('error');
             },
         });
-        // console.log(categoryId);
-        
     });
-// }
+}

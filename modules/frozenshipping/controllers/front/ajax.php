@@ -10,11 +10,12 @@ class frozenshippingAjaxModuleFrontController extends ModuleFrontController
 
     public function displayAjaxCheckCarrier()
     {
+        $this->context->cookie->__set('special_carrier', Tools::getValue('selected_carrier'));
+        $this->context->cookie->write();
         die(
             Tools::jsonEncode([
                 'id_carrier' => Tools::getValue('selected_carrier'),
             ])
         );
-        // die(dump(Tools::getAllValues()));
     }
 }

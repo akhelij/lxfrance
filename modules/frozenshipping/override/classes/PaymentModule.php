@@ -1,5 +1,4 @@
 <?php
-
 abstract class PaymentModule extends PaymentModuleCore
 {
     protected function createOrderFromCart(
@@ -22,6 +21,7 @@ abstract class PaymentModule extends PaymentModuleCore
         $carrierId = null,
         $specialCarrierId = 3
     ) {
+        die(dump('here'));
         $order = new Order();
         $order->product_list = $productList;
 
