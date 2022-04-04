@@ -63,7 +63,9 @@ class Frozenshipping extends Module
      */
     public function install()
     {
-        Configuration::updateValue('FROZENSHIPPING_LIVE_MODE', false);
+        Configuration::updateValue('FROZENSHIPPING_LIVE_MODE', true);
+
+        include dirname(__FILE__).'/sql/install.php';
 
         return parent::install() &&
             $this->registerHook('header') &&
@@ -72,14 +74,17 @@ class Frozenshipping extends Module
             $this->registerHook('displayAfterCarrier') &&
             $this->registerHook('displayBeforeCarrier') &&
             $this->registerHook('displayCarrierList') &&
-            $this->registerHook('extraCarrier') &&
+            $this->registerHook('actionPresentCart') &&
             $this->registerHook('displayOrderConfirmation');
     }
 
     public function uninstall()
     {
         Configuration::deleteByName('FROZENSHIPPING_LIVE_MODE');
+        Configuration::deleteByName('CUSTOMSHIPPING_CARRIERS_CATEGORIES');
+        Configuration::deleteByName('SPECIAL_CARRIER');
 
+        include dirname(__FILE__).'/sql/uninstall.php';
         return parent::uninstall();
     }
 
@@ -139,7 +144,7 @@ class Frozenshipping extends Module
         $carriers = Carrier::getCarriers((int)$this->context->language->id, true);
 
         $config = Configuration::get('CUSTOMSHIPPING_CARRIERS_CATEGORIES', "0::0,0");
-        list($id_category, $id_carriers) = explode('::',unserialize($config));
+        list($id_category, $carrier_references) = explode('::', unserialize($config));
 
         $category = $categories[array_search($id_category, array_column($categories, "id_category"))];
 
@@ -185,17 +190,17 @@ class Frozenshipping extends Module
                     ],
                     [
                         'type' => 'select',
-                        'name' => 'id_carriers[]',
-                        'id' => 'id_carriers',
+                        'name' => 'carrier_references[]',
+                        'id' => 'carrier_references',
                         'label' => $this->trans('Choose Carriers :'),
                         'multiple' => true,
                         'options' => [
                             'query' => $carriers,
-                            'id' => 'id_carrier',
+                            'id' => 'id_reference',
                             'name' => 'name',
-                        ],                        
+                        ],
                     ],
-                    
+
                 ),
                 'submit' => array(
                     'title' => $this->l('Save'),
@@ -210,10 +215,10 @@ class Frozenshipping extends Module
     protected function getConfigFormValues()
     {
         $config = Configuration::get('CUSTOMSHIPPING_CARRIERS_CATEGORIES', "0::0,0");
-        list($id_category, $id_carriers) = explode('::',unserialize($config));
-        return array(            
-            'id_carriers[]' => explode(',', $id_carriers),
-            // 'FROZENSHIPPING_LIVE_MODE' => Configuration::get('FROZENSHIPPING_LIVE_MODE', true),
+        list($id_category, $carrier_references) = explode('::', unserialize($config));
+
+        return array(
+            'carrier_references[]' => explode(',', $carrier_references),
         );
     }
 
@@ -223,12 +228,22 @@ class Frozenshipping extends Module
     protected function postProcess()
     {
         //Save config as {category_id::carrier_id1,carrier_id2}
-        Configuration::updateValue('CUSTOMSHIPPING_CARRIERS_CATEGORIES', serialize(Tools::getValue('id_category')."::".implode(',',Tools::getValue('id_carriers'))));
-        
-        // $form_values = $this->getConfigFormValues();
-        // foreach (array_keys($form_values) as $key) {
-        //     Configuration::updateValue($key, Tools::getValue($key));
-        // }
+        Configuration::updateValue('CUSTOMSHIPPING_CARRIERS_CATEGORIES', serialize(Tools::getValue('id_category')."::".implode(',',Tools::getValue('carrier_references'))));
+
+        //Reseting the old config
+        Db::getInstance()->execute('UPDATE `' . _DB_PREFIX_ . 'carrier` SET `frozen_shipping` = 0');
+
+        //Adding the new config
+            //Generation of query
+        $condition = "";
+        foreach (Tools::getValue('carrier_references') as $key => $id_carrier) {
+            $condition .= ($key == 0) ? " WHERE " : " OR ";
+            $condition .= "`id_reference` = $id_carrier";
+        }
+            //Executing query
+        if ($condition != "") {
+            Db::getInstance()->execute("UPDATE `" . _DB_PREFIX_ . "carrier` SET `frozen_shipping` = 1 ".$condition);
+        }
     }
 
     /**
@@ -251,11 +266,6 @@ class Frozenshipping extends Module
         $this->context->controller->addCSS($this->_path.'/views/css/front.css');
     }
 
-    public function hookDisplayCarrierList()
-    {
-        /* Place your code here. */
-    }
-
     public function hookDisplayOrderConfirmation()
     {
         /* Place your code here. */
@@ -266,33 +276,28 @@ class Frozenshipping extends Module
         $selected_carrier = null;
 
         $config = Configuration::get('CUSTOMSHIPPING_CARRIERS_CATEGORIES', "0::0,0");
-        list($id_category, $id_carriers) = explode('::',unserialize($config));
-        
-        foreach($this->context->cart->getProducts() as $product)
-        {
-            if($this->has_frozen_products = in_array($id_category, (new Product($product))->getCategories()))
-            {
+        list($id_category, $carrier_references) = explode('::', unserialize($config));
+
+        foreach ($this->context->cart->getProducts() as $product) {
+            if ($this->has_frozen_products = in_array($id_category, (new Product($product))->getCategories())) {
                 break;
             }
         }
 
-        if($this->has_frozen_products)
-        {
-            if($this->context->cookie->__isset('special_carrier'))
-            {
-                $selected_carrier = $this->context->cookie->__get('special_carrier');
-            }
+        if ($this->has_frozen_products) {
             $special_carriers = [];
-            // $carriers = Carrier::getCarriers((int)$this->context->language->id, true);
-
             foreach ($this->getDeliveryOptions() as $carrier) {
-                if(in_array($carrier['id'], explode(',', $id_carriers)))
-                {
+                if (in_array($carrier['id'], explode(',', $carrier_references))) {
                     array_push($special_carriers, $carrier);
                 }
             }
 
-            // die(dump($special_carriers));
+            $special_carrier = unserialize(Configuration::get('SPECIAL_CARRIER'));
+
+            if (isset($special_carrier)) {
+                $selected_carrier = $special_carrier['id'];
+            }
+
             $this->context->smarty->assign(
                 array(
                     'carriers' => $special_carriers,
@@ -302,47 +307,27 @@ class Frozenshipping extends Module
 
             return $this->display(__FILE__, 'views/templates/custom.tpl');
         } else {
-            $this->context->cookie->__unset('special_carrier');
+            $this->context->cookie->__unset('special_carrier_id');
+            Configuration::deleteByName('SPECIAL_CARRIER');
         }
     }
 
     public function hookActionCarrierProcess($params)
     {
         // Generating link to our ajax method;
-        $ajax_link = Context::getContext()->link->getModuleLink($this->name, 'ajax');        
+        // $ajax_link = Context::getContext()->link->getModuleLink($this->name, 'OrderController');
         Media::addJsDef([
-            'AJAX_URL' => $ajax_link,
+            'AJAX_URL' => '/index.php?controller=order',
         ]);
-        
-        // if (isset($params['cart']->id_carrier)) {
-        //     $carrier_name = Db::getInstance()->getValue('SELECT name FROM `'._DB_PREFIX_.'carrier` WHERE id_carrier = '.(int)$params['cart']->id_carrier);
-        //     $this->_manageData('MBG.addCheckoutOption(2,\''.$carrier_name.'\');', 'A');
-        //     var_dump($_POST);
-        //     var_dump(Tools::getValue($_POST));
-        //     //die();
-        // }
-    }
-
-    public function hookDisplayAfterCarrier($params)
-    {
-        /* Place your code here. */       
-        
-        // die(dump($params));
-        // Configuration::updateValue('custom_text', 'xxxx');
-        // $this->context->smarty->assign(
-        //     array('custom_text' => Configuration::get('custom_text'))
-        // );
-        // return $this->display(__FILE__, 'views/templates/custom.tpl');
-    }
-
-    public function hookExtraCarrier($params)
-    {
-       /* Place your code here. */
     }
 
     public function getDeliveryOptions()
     {
-        $delivery_option_list = $this->context->cart->getDeliveryOptionList();
+        /* This is a duplication from classes/checkout/DeliveryOptionsFinder.php that will help me to filter */
+        $this->context->cookie->__set('show_frozen_carriers', 1);
+        $this->context->cookie->write();
+
+        $delivery_option_list = $this->context->cart->getDeliveryOptionList(null, true);
         $include_taxes = !Product::getTaxCalculationMethod((int) $this->context->cart->id_customer) && (int) Configuration::get('PS_TAX');
         $display_taxes_label = (Configuration::get('PS_TAX') && !Configuration::get('AEUC_LABEL_TAX_INC_EXC'));
 
@@ -406,6 +391,7 @@ class Frozenshipping extends Module
             }
         }
 
+        $this->context->cookie->__unset('show_frozen_carriers');
         return $carriers_available;
     }
 

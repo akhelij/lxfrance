@@ -967,7 +967,7 @@
   ),
   'Cart' => 
   array (
-    'path' => '',
+    'path' => 'override/classes/Cart.php',
     'type' => 'class',
     'override' => false,
   ),
@@ -2623,7 +2623,7 @@
   ),
   'OrderController' => 
   array (
-    'path' => '',
+    'path' => 'override/controllers/front/OrderController.php',
     'type' => 'class',
     'override' => false,
   ),
@@ -2923,8 +2923,8 @@
   ),
   'PaymentModule' => 
   array (
-    'path' => '',
-    'type' => 'abstract class',
+    'path' => 'override/classes/PaymentModule.php',
+    'type' => 'class',
     'override' => false,
   ),
   'PaymentModuleCore' => 

@@ -28,13 +28,17 @@
 
 if(typeof(AJAX_URL) != 'undefined'){
     $('.frozenshipping_module .js-frozen-carrier').on('click', function(){
-        console.info(AJAX_URL);
-        var selected_carrier = 0;
+        var id = 0;
+        var reference = 0;
+        var price = 0;
+        var price_with_tax = 0;
 
         $('.js-frozen-carrier[name="delivery_option[]"]').each(function(){
             if($(this).is(':checked')){
-                selected_carrier = $(this).val();
-                console.info(selected_carrier);
+                id = $(this).val();
+                reference = $(this)[0].dataset.reference;
+                price = $(this)[0].dataset.price;
+                price_with_tax = $(this)[0].dataset.pricewithtax;
             }
     });
 
@@ -45,11 +49,16 @@ if(typeof(AJAX_URL) != 'undefined'){
             dataType : "json",
             data: {
                 action: 'checkCarrier',
-                selected_carrier: selected_carrier,
+                special_carrier: {
+                    'id': id,
+                    'reference': reference,
+                    'price': price,
+                    'price_with_tax': price_with_tax
+                },
                 ajax: 1
             },
             success : function (result) {
-                console.log(result);
+                $('#js-checkout-summary').replaceWith(result.preview);
             },
             error : function (error) {
                 console.log('error');

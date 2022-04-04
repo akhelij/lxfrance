@@ -25,10 +25,7 @@
 */
 $sql = array();
 
-$sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'frozenshipping` (
-    `id_frozenshipping` int(11) NOT NULL AUTO_INCREMENT,
-    PRIMARY KEY  (`id_frozenshipping`)
-) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;';
+$sql[] = 'ALTER TABLE `' . _DB_PREFIX_ . 'carrier` ADD COLUMN `frozen_shipping` BOOLEAN DEFAULT (0); ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;';
 
 foreach ($sql as $query) {
     if (Db::getInstance()->execute($query) == false) {

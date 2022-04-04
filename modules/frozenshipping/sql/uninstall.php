@@ -31,6 +31,9 @@
  */
 $sql = array();
 
+$sql[] = 'ALTER TABLE `' . _DB_PREFIX_ . 'carrier` DROP COLUMN `frozen_shipping`;
+) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;';
+
 foreach ($sql as $query) {
     if (Db::getInstance()->execute($query) == false) {
         return false;

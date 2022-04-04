@@ -1,11 +1,22 @@
-<div class="delivery-options frozenshipping_module">
+{if $carriers|count }
+
+    <div class="delivery-options frozenshipping_module">
     <h6> Livraison de vos produits surgelés : </h6>
 
-    {foreach from=$carriers item=carrier key=carrier_id}   
+    {foreach from=$carriers item=carrier key=carrier_id}
         <div class="row delivery-option">
         <div class="col-sm-1">
             <span class="custom-radio float-xs-left">
-            <input type="radio" class="js-frozen-carrier" name="delivery_option[]" id="delivery_option_{$carrier.id}" value="{$carrier.id}"{if $special_carrier == $carrier.id} checked{/if}>
+            <input
+                    type="radio"
+                    class="js-frozen-carrier"
+                    name="delivery_option[]"
+                    id="delivery_option_{$carrier.id}"
+                    value="{$carrier.id}"
+                    data-reference="{$carrier.id_reference}"
+                    data-price="{$carrier.price_without_tax}"
+                    data-pricewithtax="{$carrier.price_with_tax}"
+                    {if $special_carrier == $carrier.id} checked{/if}>
             <span></span>
             </span>
         </div>
@@ -36,7 +47,9 @@
         {$carrier.extraContent nofilter}
         </div>
         <div class="clearfix"></div>
-    {/foreach}     
-        
-    <h6> Livraison de vos produits secs : </h6>       
+    {/foreach}
+
+    <h6> Livraison de vos produits secs : </h6>
 </div>
+
+{/if}

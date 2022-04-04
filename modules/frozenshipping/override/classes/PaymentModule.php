@@ -1,6 +1,21 @@
 <?php
-abstract class PaymentModule extends PaymentModuleCore
+class PaymentModule extends PaymentModuleCore
 {
+    /*
+    * module: frozenshipping
+    * date: 2022-03-31 08:30:00
+    * version: 1.0.0
+    */
+    /*
+    * module: frozenshipping
+    * date: 2022-03-31 08:30:00
+    * version: 1.0.0
+    */
+    /*
+    * module: frozenshipping
+    * date: 2022-04-01 06:55:17
+    * version: 1.0.0
+    */
     protected function createOrderFromCart(
         Cart $cart,
         Currency $currency,
@@ -18,15 +33,11 @@ abstract class PaymentModule extends PaymentModuleCore
         $debug,
         $order_status,
         $id_order_state,
-        $carrierId = null,
-        $specialCarrierId = 3
+        $carrierId = null
     ) {
-        die(dump('here'));
         $order = new Order();
         $order->product_list = $productList;
-
         $computingPrecision = Context::getContext()->getComputingPrecision();
-
         if (Configuration::get('PS_TAX_ADDRESS_TYPE') == 'id_address_delivery') {
             $address = new Address((int) $addressId);
             $context->country = new Country((int) $address->id_country, (int) $cart->id_lang);
@@ -34,7 +45,16 @@ abstract class PaymentModule extends PaymentModuleCore
                 throw new PrestaShopException('The delivery address country is not active.');
             }
         }
-        
+
+
+        $special_carrier = unserialize(Configuration::get('SPECIAL_CARRIER'));
+        if (!isset($special_carrier)) {
+            $special_carrier['id'] = null;
+            $special_carrier['price'] = null;
+            $special_carrier['price_with_tax'] = null;
+        }
+
+
         $carrier = null;
         if (!$cart->isVirtualCart() && isset($carrierId)) {
             $carrier = new Carrier((int) $carrierId, (int) $cart->id_lang);
@@ -45,6 +65,7 @@ abstract class PaymentModule extends PaymentModuleCore
             $carrierId = 0;
         }
 
+
         $order->id_customer = (int) $cart->id_customer;
         $order->id_address_invoice = (int) $cart->id_address_invoice;
         $order->id_address_delivery = (int) $addressId;
@@ -54,7 +75,6 @@ abstract class PaymentModule extends PaymentModuleCore
         $order->reference = $reference;
         $order->id_shop = (int) $context->shop->id;
         $order->id_shop_group = (int) $context->shop->id_shop_group;
-
         $order->secure_key = ($secure_key ? pSQL($secure_key) : pSQL($context->customer->secure_key));
         $order->payment = $payment_method;
         if (isset($name)) {
@@ -85,17 +105,15 @@ abstract class PaymentModule extends PaymentModuleCore
             $computingPrecision
         );
         $order->total_discounts = $order->total_discounts_tax_incl;
-
         $order->total_shipping_tax_excl = Tools::ps_round(
-            (float) $cart->getPackageShippingCost($carrierId, false, null, $order->product_list),
-            $computingPrecision
-        );
+                (float) $cart->getPackageShippingCost($carrierId, false, null, $order->product_list),
+                $computingPrecision
+            ) + (int) $special_carrier['price'];
         $order->total_shipping_tax_incl = Tools::ps_round(
-            (float) $cart->getPackageShippingCost($carrierId, true, null, $order->product_list),
-            $computingPrecision
-        );
+                (float) $cart->getPackageShippingCost($carrierId, true, null, $order->product_list),
+                $computingPrecision
+            ) + (int) $special_carrier['price_with_tax'];
         $order->total_shipping = $order->total_shipping_tax_incl;
-
         if (null !== $carrier && Validate::isLoadedObject($carrier)) {
             $order->carrier_tax_rate = $carrier->getTaxesRate(new Address((int) $cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')}));
         }
@@ -109,40 +127,30 @@ abstract class PaymentModule extends PaymentModuleCore
             $computingPrecision
         );
         $order->total_wrapping = $order->total_wrapping_tax_incl;
-
         $order->total_paid_tax_excl = Tools::ps_round(
-            (float) $cart->getOrderTotal(false, Cart::BOTH, $order->product_list, $carrierId),
-            $computingPrecision
-        );
+                (float) $cart->getOrderTotal(false, Cart::BOTH, $order->product_list, $carrierId),
+                $computingPrecision
+            ) + (int) $special_carrier['price'];
+
         $order->total_paid_tax_incl = Tools::ps_round(
-            (float) $cart->getOrderTotal(true, Cart::BOTH, $order->product_list, $carrierId),
-            $computingPrecision
-        );
+                (float) $cart->getOrderTotal(true, Cart::BOTH, $order->product_list, $carrierId),
+                $computingPrecision
+            ) + (int) $special_carrier['price_with_tax'];
+
         $order->total_paid = $order->total_paid_tax_incl;
         $order->round_mode = Configuration::get('PS_PRICE_ROUND_MODE');
         $order->round_type = Configuration::get('PS_ROUND_TYPE');
-
         $order->invoice_date = '0000-00-00 00:00:00';
         $order->delivery_date = '0000-00-00 00:00:00';
-
-        // die(dump($order));
-
         if ($debug) {
             PrestaShopLogger::addLog('PaymentModule::validateOrder - Order is about to be added', 1, null, 'Cart', (int) $cart->id, true);
         }
 
-        // Creating order
         $result = $order->add();
-
         if (!$result) {
             PrestaShopLogger::addLog('PaymentModule::validateOrder - Order cannot be created', 3, null, 'Cart', (int) $cart->id, true);
             throw new PrestaShopException('Can\'t save Order');
         }
-
-        // Amount paid by customer is not the right one -> Status = payment error
-        // We don't use the following condition to avoid the float precision issues : http://www.php.net/manual/en/language.types.float.php
-        // if ($order->total_paid != $order->total_paid_real)
-        // We use number_format in order to compare two string
         if ($order_status->logable
             && number_format(
                 $cart_total_paid,
@@ -154,21 +162,14 @@ abstract class PaymentModule extends PaymentModuleCore
         ) {
             $id_order_state = Configuration::get('PS_OS_ERROR');
         }
-
         if ($debug) {
             PrestaShopLogger::addLog('PaymentModule::validateOrder - OrderDetail is about to be added', 1, null, 'Cart', (int) $cart->id, true);
         }
-
-        // Insert new Order detail list using cart for the current order
         $order_detail = new OrderDetail(null, null, $context);
         $order_detail->createList($order, $cart, $id_order_state, $order->product_list, 0, true, $warehouseId);
-
         if ($debug) {
             PrestaShopLogger::addLog('PaymentModule::validateOrder - OrderCarrier is about to be added', 1, null, 'Cart', (int) $cart->id, true);
         }
-
-        $special_carrier = new Carrier((int) $specialCarrierId, (int) $cart->id_lang);
-        // Adding an entry in order_carrier table
         if (null !== $carrier) {
             $order_carrier = new OrderCarrier();
             $order_carrier->id_order = (int) $order->id;
@@ -178,17 +179,15 @@ abstract class PaymentModule extends PaymentModuleCore
             $order_carrier->shipping_cost_tax_incl = (float) $order->total_shipping_tax_incl;
             $order_carrier->add();
         }
-
-        if (null !== $special_carrier) {
+        if (isset($special_carrier)) {
             $order_carrier = new OrderCarrier();
             $order_carrier->id_order = (int) $order->id;
-            $order_carrier->id_carrier = $special_carrier;
+            $order_carrier->id_carrier = (int) $special_carrier['id'];
             $order_carrier->weight = (float) $order->getTotalWeight();
             $order_carrier->shipping_cost_tax_excl = (float) $order->total_shipping_tax_excl;
             $order_carrier->shipping_cost_tax_incl = (float) $order->total_shipping_tax_incl;
             $order_carrier->add();
         }
-
         return ['order' => $order, 'orderDetail' => $order_detail];
     }
 }
